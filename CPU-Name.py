@@ -62,6 +62,13 @@ class CPUName:
             except ValueError:
                 break
 
+    def _get_cpu_name(self):
+        # Gets the cpu name via sysctl
+        output = self.run({"args" : ["sysctl", "-n", "machdep.cpu.brand_string"]})
+        if output[2] == 0:
+            return output[0].replace("\n", "")
+        return None
+
     def _stream_output(self, comm, shell = False):
         output = error = ""
         p = ot = et = None
@@ -180,7 +187,7 @@ class CPUName:
 
     def check_sip(self):
         # Checks our sip status and warns if needed
-        sip_stats = self.run({"args" : ["csrutil", "status"]})[0]
+        sip_stats = self.run({"args" : ["csrutil", "status"], "stream" : True})[0]
         msg = "Unknown SIP Configuration!\n"
         title = "Unknown"
         if not sip_stats.startswith("System Integrity Protection status:"):
@@ -231,6 +238,13 @@ class CPUName:
         print("  {}".format("#"*width))
         mid_len = int(round(width/2-len(text)/2)-2)
         middle = " #{}{}{}#".format(" "*mid_len, text, " "*((width - mid_len - len(text))-2))
+        if len(middle) > width+1:
+            # Get the difference
+            di = len(middle) - width
+            # Add the padding for the ...#
+            di += 3
+            # Trim the string
+            middle = middle[:-di] + "...#"
         print(middle)
         print("#"*width)
 
@@ -267,12 +281,14 @@ class CPUName:
             { 
                 "args" : ["rm", string_path], 
                 "sudo" : True, 
-                "message" : "Removing " + string_path + "...\n" 
+                "message" : "Removing " + string_path + "...\n",
+                "stream" : True
             },
             { 
                 "args" : ["sudo", "mv", "-f", bak_path, string_path], 
                 "sudo" : True,
-                "message" : "Renaming {}.bak to {}...".format(self.file_n, self.file_n)
+                "message" : "Renaming {}.bak to {}...".format(self.file_n, self.file_n),
+                "stream" : True
             }
         ]
         self.run(c, True)
@@ -292,7 +308,7 @@ class CPUName:
             return
         # Removing
         print("Removing " + string_path + "...")
-        self.run({"args":["rm", string_path],"sudo":True})
+        self.run({"args":["rm", string_path],"sudo":True, "stream" : True})
         print(" ")
         print("Done.")
         time.sleep(5)
@@ -327,7 +343,8 @@ class CPUName:
             self.run({
                 "args" : ["cp", string_path, string_path+".bak"],
                 "sudo" : True,
-                "message" : "Creating backup...\n"
+                "message" : "Creating backup...\n",
+                "stream" : True
             })
 
         # Change the build number and write to the main plist
@@ -342,7 +359,8 @@ class CPUName:
         c = [
             {
                 "args" : ["mv", "-f", temp_file, string_path],
-                "sudo" : True
+                "sudo" : True,
+                "stream" : True
             }
         ]
         self.run(c, True)
@@ -359,6 +377,8 @@ class CPUName:
         print(" ")
         os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
+        cpu_name = self._get_cpu_name()
+
         print("Current Language:    {}".format(self.lang))
         string_path = os.path.join(self._get_lproj(self.lang), self.file_n)
         try:
@@ -367,6 +387,9 @@ class CPUName:
         except:
             print("Language lproj doesn't exist!")
         print(" ")
+
+        if cpu_name:
+            print("C. Use: {}".format(cpu_name))
         bak = False
         if os.path.exists(string_path+".bak"):
             bak = True
@@ -385,6 +408,9 @@ class CPUName:
             return
         elif menu.lower() == "r" and bak:
             self.restore_backup()
+            return
+        elif menu.lower() == "c" and cpu_name:
+            self.set_cpu(cpu_name)
             return
         # Check for lproj
         if menu.lower().endswith(".lproj"):

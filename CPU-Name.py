@@ -6,6 +6,7 @@ import tempfile
 import shutil
 import subprocess
 import re
+import json
 import threading
 try:
     from Queue import Queue, Empty
@@ -68,6 +69,17 @@ class CPUName:
         if output[2] == 0:
             return output[0].replace("\n", "")
         return None
+
+    def _get_plist_dict(self, path):
+        # Returns a dict of the plist data as a dict
+        if not os.path.exists(path):
+            return None
+        try:
+            p_string = self.run({"args" : ["plutil", "-convert", "json", "-o", "-", "--", path ]})[0]
+            d = json.loads(p_string)
+        except:
+            return None
+        return d
 
     def _stream_output(self, comm, shell = False):
         output = error = ""
@@ -333,8 +345,11 @@ class CPUName:
         string_path = os.path.join(self._get_lproj(self.lang), self.file_n)
 
         try:
-            string_plist = plistlib.readPlist(string_path)
+            string_plist = self._get_plist_dict(string_path)
         except:
+            string_plist = None
+
+        if string_plist == None:
             print("Failed to read {}...".format(self.file_n))
             time.sleep(5)
             return
@@ -379,13 +394,19 @@ class CPUName:
 
         cpu_name = self._get_cpu_name()
 
-        print("Current Language:    {}".format(self.lang))
+        print("Current Language:    {}\n".format(self.lang))
         string_path = os.path.join(self._get_lproj(self.lang), self.file_n)
         try:
-            string_plist = plistlib.readPlist(string_path)
-            print("Current Unknown CPU: {}".format(string_plist["UnknownCPUKind"]))
+            string_plist = self._get_plist_dict(string_path)
         except:
-            print("Language lproj doesn't exist!")
+            string_plist = None
+        if string_plist == None:
+            if os.path.exists(string_path):
+                print("{} is unreadable!".format(self.file_n))
+            else:
+                print("{} doesn't exist!".format(self.file_n))
+        else:
+            print("Current Unknown CPU: {}".format(string_plist["UnknownCPUKind"]))
         print(" ")
 
         if cpu_name:

@@ -435,7 +435,15 @@ class CPUName:
             return
         # Check for lproj
         if menu.lower().endswith(".lproj"):
-            self.lang = ".".join(menu.split(".")[:-1])
+            test = ".".join(menu.split(".")[:-1])
+            if not self._get_lproj(test):
+                self.head("Language Not Found")
+                print("")
+                print("{} doesn't appear to exist.".format(menu))
+                print("")
+                time.sleep(5)
+                return
+            self.lang = test
             return
 
         # Should be a new cpu

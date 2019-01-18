@@ -5,6 +5,6 @@ To install, do the following one line at a time in Terminal:
 
     git clone https://github.com/corpnewt/CPU-Name
     cd CPU-Name
-    chmod +x Run.command
+    chmod +x CPU-Name.command
     
-Then run with either `./Run.command` or by double-clicking *Run.command*
+Then run with either `./CPU-Name.command` or by double-clicking *CPU-Name.command*

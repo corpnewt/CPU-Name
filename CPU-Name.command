@@ -40,7 +40,7 @@ class CPUName:
         self.sip_checked = False
 
     def _get_locale(self):
-        # Runs an applescript to determine the current system locale
+        # Gather preferences to determine the current system locale
         locale = self.r.run({"args":["defaults","read",".GlobalPreferences","AppleLanguages"]})[0].strip()
         # This will be a list of languages, we need to cut it up and get the top one
         try:

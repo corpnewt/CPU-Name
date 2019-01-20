@@ -23,11 +23,44 @@ class CPUName:
             print(" ")
             exit(1)
 
-        self.lang     = "English" # this is the name before the .lproj
+        # Set up a dict that has the normalized languages
+        # and their locale codes
+        self.l_dict   = {
+            "nl_US" : "Dutch",
+            "en_US" : "English",
+            "fr_US" : "French",
+            "de_US" : "German",
+            "it_US" : "Italian",
+            "ja_US" : "Japanese",
+            "es_US" : "Spanish"
+        }
+        self.lang     = self._get_locale()
         self.str_path = "/System/Library/PrivateFrameworks/AppleSystemInfo.framework/Versions/A/Resources/"
         self.file_n   = "AppleSystemInfo.strings"
-
         self.sip_checked = False
+
+    def _get_locale(self):
+        # Runs an applescript to determine the current system locale
+        locale = self.r.run({"args":["defaults","read",".GlobalPreferences","AppleLanguages"]})[0].strip()
+        # This will be a list of languages, we need to cut it up and get the top one
+        try:
+            # Get the top item of the list between quotes, and convert - to _
+            locale = locale.split("\n")[1].split('"')[1].replace("-","_")
+        except:
+            # Not found - default to English
+            return "English"
+        # Returns the normalized locale if in the l_dict - or the returned locale
+        return self.l_dict.get(locale,locale)
+
+    def _p(self, text):
+        # Attempts to print unicode chars safely... attempts...
+        if sys.version_info >= (3, 0):
+            if isinstance(text, bytes):
+                text = text.decode("utf-8")
+        else:
+            if isinstance(text, (str,unicode)):
+                text = text.encode("utf-8")
+        return text
 
     def _get_lproj(self, lang_name):
         # Returns the lang_name.lproj if it exists
@@ -161,19 +194,17 @@ class CPUName:
             else:
                 return
 
-        self.u.head("Setting CPU to {}".format(cpu))
+        self.u.head("Setting CPU to {}".format(self._p(cpu)))
         print(" ")
         os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
         # Start our command list
         c = []
-
-        string_path = os.path.join(self._get_lproj(self.lang), self.file_n)
-
         try:
+            string_path = os.path.join(self._get_lproj(self.lang), self.file_n)
             string_plist = self._get_plist_dict(string_path)
         except:
-            string_plist = None
+            string_plist = string_path = None
 
         if string_plist == None:
             self.u.grab("Failed to read {}...".format(self.file_n),timeout=5)
@@ -220,24 +251,24 @@ class CPUName:
         cpu_name = self._get_cpu_name()
 
         print("Current Language:    {}\n".format(self.lang))
-        string_path = os.path.join(self._get_lproj(self.lang), self.file_n)
         try:
+            string_path = os.path.join(self._get_lproj(self.lang), self.file_n)
             string_plist = self._get_plist_dict(string_path)
         except:
-            string_plist = None
+            string_path = string_plist = None
         if string_plist == None:
-            if os.path.exists(string_path):
+            if string_path and os.path.exists(string_path):
                 print("{} is unreadable!".format(self.file_n))
             else:
                 print("{} doesn't exist!".format(self.file_n))
         else:
-            print("Current Unknown CPU: {}".format(string_plist["UnknownCPUKind"]))
+            print("Current Unknown CPU: {}".format(self._p(string_plist["UnknownCPUKind"])))
         print(" ")
 
         if cpu_name:
             print("C. Use: {}".format(cpu_name))
         bak = False
-        if os.path.exists(string_path+".bak"):
+        if string_path and os.path.exists(string_path+".bak"):
             bak = True
             print("D. Delete Backup")
             print("R. Restore Backup")

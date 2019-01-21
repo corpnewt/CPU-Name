@@ -38,6 +38,9 @@ class CPUName:
         self.str_path = "/System/Library/PrivateFrameworks/AppleSystemInfo.framework/Versions/A/Resources/"
         self.file_n   = "AppleSystemInfo.strings"
         self.sip_checked = False
+        # Verify the default lang exists - fall back on English if not
+        if not self._get_lproj(self.lang):
+            self.lang = "English"
 
     def _get_locale(self):
         # Gather preferences to determine the current system locale

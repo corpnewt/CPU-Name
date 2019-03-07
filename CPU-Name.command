@@ -25,7 +25,7 @@ class CPUName:
 
         # Set up a dict that has the normalized languages
         # and their locale codes
-        self.l_dict   = {
+        self.old_l_dict   = {
             "nl_US" : "Dutch",
             "en_US" : "English",
             "fr_US" : "French",
@@ -34,13 +34,27 @@ class CPUName:
             "ja_US" : "Japanese",
             "es_US" : "Spanish"
         }
-        self.lang     = self._get_locale()
+        self.new_l_dict = {
+            "nl_US" : "nl",
+            "en_US" : "en",
+            "fr_US" : "fr",
+            "de_US" : "de",
+            "it_US" : "it",
+            "ja_US" : "ja",
+            "es_US" : "es"
+        }
+        self.names = {}
+        for x in self.old_l_dict:
+            self.names[self.new_l_dict[x]] = self.old_l_dict[x]
         self.str_path = "/System/Library/PrivateFrameworks/AppleSystemInfo.framework/Versions/A/Resources/"
         self.file_n   = "AppleSystemInfo.strings"
+        # Check if en.lproj exists - if not fall back to the old locale names
+        self.l_dict = self.new_l_dict if self._get_lproj("en") else self.old_l_dict
+        self.lang   = self._get_locale()
         self.sip_checked = False
         # Verify the default lang exists - fall back on English if not
         if not self._get_lproj(self.lang):
-            self.lang = "English"
+            self.lang = self.l_dict.get("en_US","English")
 
     def _get_locale(self):
         # Gather preferences to determine the current system locale
@@ -252,10 +266,13 @@ class CPUName:
         os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
         cpu_name = self._get_cpu_name()
+        locale_name = self.names.get(self.lang, self.lang)
+        lproj = self._get_lproj(self.lang)
+        ltext = os.path.basename(lproj) if lproj != None else "lproj not found!"
 
-        print("Current Language:    {}\n".format(self.lang))
+        print("Current Locale:      {} ({})\n".format(locale_name, ltext))
         try:
-            string_path = os.path.join(self._get_lproj(self.lang), self.file_n)
+            string_path = os.path.join(lproj, self.file_n)
             string_plist = self._get_plist_dict(string_path)
         except:
             string_path = string_plist = None

@@ -33,7 +33,7 @@ System Integrity Protection (SIP) has to be temporarily disabled for your Mac/Ha
 
 
 
-#Possible fix (haven't tried yet):
+## Possible fix (haven't tried yet):
 To modify your root system volume:
 disable SIP and authenticated root
 mount the root system in some folder

@@ -29,3 +29,18 @@ System Integrity Protection (SIP) has to be temporarily disabled for your Mac/Ha
     csrutil enable
     reboot
 ```
+
+
+
+
+#Possible fix (haven't tried yet):
+To modify your root system volume:
+disable SIP and authenticated root
+mount the root system in some folder
+mkdir root
+sudo /sbin/mount -o nobrowse -t apfs /dev/disk1sf /Users/youruser/root/ // lookup the proper disk with mount
+make the modifications witin /root
+create a new snapshot with the changes
+sudo bless --folder /Users/youruser/root/System/Library/CoreServices --bootefi --create-snapshot
+after that you can re-enable SIP but not authenticated root, macOS will not boot anymore if authenticated root is enabled
+it will mount the new snapshot readonly again, but it is not signed. Because of that you can't enable authenticated root anymore

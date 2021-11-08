@@ -9,6 +9,7 @@ class CPUName:
         self.plist_data = {}
         self.clear_empty = True
         self.detected = self.detect_cores()
+        self.cpu_model = self.detect_cpu_model()
 
     def ensure_path(self, plist_data, path_list, final_type = list):
         if not path_list: return plist_data
@@ -107,31 +108,37 @@ class CPUName:
             elif proc == "3": return 0
             elif self.detected != -1 and proc == "4": return 1537 if self.detected < 8 else 3841
 
+    def detect_cpu_model(self):
+        try:
+            _platform = platform.system().lower()
+            if _platform == "darwin":
+                return subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"]).decode().strip()
+            elif _platform == "windows":
+                return subprocess.check_output(["wmic", "cpu", "get", "Name"]).decode().split("\n")[1].strip()
+            elif _platform == "linux":
+                data = subprocess.check_output(["cat", "/proc/cpuinfo"]).decode().split("\n")
+                for line in data:
+                    if line.startswith("model name"):
+                        return ": ".join([x for x in line.split(": ")[1:]])
+        except:
+            pass
+        return ""
+
     def detect_cores(self):
         try:
             _platform = platform.system().lower()
-
             if _platform == "darwin":
-                data = subprocess.check_output(["sysctl", "-a", "machdep.cpu.core_count"]).decode().split(":")[1].strip()
-
-                return int(data)
-
+                return int(subprocess.check_output(["sysctl", "-a", "machdep.cpu.core_count"]).decode().split(":")[1].strip())
             elif _platform == "windows":
-                data = subprocess.check_output(["wmic", "cpu", "get", "NumberOfCores"]).decode().split("\n")[1].strip()
-
-                return int(data)
-
+                return int(subprocess.check_output(["wmic", "cpu", "get", "NumberOfCores"]).decode().split("\n")[1].strip())
             elif _platform == "linux":
                 data = subprocess.check_output(["cat", "/proc/cpuinfo"]).decode().split("\n")
-                value = ""
-
                 for line in data:
                     if line.startswith("cpu cores"):
-                        value = line.split(":")[1].strip()
-
-                return int(value)
-        except Exception:
-            return -1
+                        return int(line.split(":")[1].strip())
+        except:
+            pass
+        return -1
 
     def set_values(self, revcpu, cpuname, proctype, plist_data):
         # Clear any prior values and ensure pathing
@@ -189,6 +196,8 @@ class CPUName:
             print("")
             print("Current CPU Name: {}".format(cpu_nam[0]+" (boot-arg)" if cpu_nam[0] else cpu_nam[1] if cpu_nam[1] else "Not Set"))
             print("")
+            if self.cpu_model:
+                print("L. Use Local Machine's Value ({})".format(self.cpu_model))
             print("M. Return To Menu")
             print("Q. Quit")
             print("")
@@ -196,6 +205,7 @@ class CPUName:
             if not len(name): continue
             elif name.lower() == "m": return
             elif name.lower() == "q": self.u.custom_quit()
+            elif self.cpu_model and name.lower() == "l": return self.cpu_model
             return name
 
     def save_plist(self):

@@ -94,7 +94,7 @@ class CPUName:
             print("2. Set to 0x0F01 for 8+ Core")
             print("3. Reset to the default 0x00")
             if self.detected != -1:
-                print("4. Use Local Machine's Value ({} Cores = {})".format(self.detected, "0x0601" if self.detected < 8 else "0x0F01"))
+                print("4. Use Local Machine's Value ({:,} Core{} = {})".format(self.detected, "" if self.detected==1 else "s", "0x0601" if self.detected < 8 else "0x0F01"))
             print("")
             print("M. Return To Menu")
             print("Q. Quit")

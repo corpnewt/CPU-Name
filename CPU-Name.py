@@ -5,6 +5,7 @@ class CPUName:
         self.u = utils.Utils("CPU-Name")
         self.plist_path = None
         self.plist_data = {}
+        self.clear_empty = True
 
     def ensure_path(self, plist_data, path_list, final_type = list):
         if not path_list: return plist_data
@@ -119,15 +120,31 @@ class CPUName:
         nv_d_val  = plist_data.get("NVRAM",{}).get("Delete",{}).get("4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",[])
         if any(x in boot_args for x in ("revcpu=","revcpuname=")):
             boot_args = " ".join([x for x in boot_args.split() if not x.startswith(("revcpu=","revcpuname="))])
-            plist_data["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = boot_args
+            if boot_args:
+                plist_data["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = boot_args
+            elif self.clear_empty:
+                # Clean out boot-args and the UUID if they're both empty
+                plist_data["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].pop("boot-args",None)
+                if not plist_data["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]:
+                    plist_data["NVRAM"]["Add"].pop("7C436110-AB2A-4BBB-A880-FE41995C9F82",None)
         if any(x in nv_a_val for x in ("revcpu","revcpuname")):
             for x in ("revcpu","revcpuname"):
                 nv_a_val.pop(x,None)
-            plist_data["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"] = nv_a_val
+            if nv_a_val:
+                plist_data["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"] = nv_a_val
+            elif self.clear_empty:
+                # Clean out the UUID if empty
+                plist_data["NVRAM"]["Add"].pop("4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",None)
         if any(x in nv_d_val for x in ("revcpu","revcpuname")):
-            plist_data["NVRAM"]["Delete"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"] = [x for x in nv_d_val if not x in ("revcpu","revcpuname")]
+            nv_d_val = [x for x in nv_d_val if not x in ("revcpu","revcpuname")]
+            if nv_d_val:
+                plist_data["NVRAM"]["Delete"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"] = nv_d_val
+            elif self.clear_empty:
+                # Clean out the UUID if empty
+                plist_data["NVRAM"]["Delete"].pop("4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",None)
         if plist_data.get("PlatformInfo",{}).get("Generic",{}).get("ProcessorType",0) != 0:
             plist_data["PlatformInfo"]["Generic"]["ProcessorType"] = 0
+        self.u.grab("...")
         return plist_data
 
     def get_hex(self, value, pad_to=2):
@@ -177,6 +194,9 @@ class CPUName:
             print("Rev CPU:        {}".format("" if not self.plist_path else cpu_rev[0]+" (boot-arg)" if cpu_rev[0] else cpu_rev[1] if cpu_rev[1] else "Not Set"))
             print("Processor Type: {}{}".format("" if not self.plist_path else self.get_hex(p_type),"" if not self.plist_path else p_label))
             print("RestrictEvents: {}".format("" if not self.plist_path else k_label))
+            print("")
+            print("Note:  Changes are saved to the target plist immediately.")
+            print("       Make sure you keep a backup!")
             print("")
             print("1. Change CPU Name")
             print("2. Change Processor Type")

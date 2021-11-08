@@ -93,9 +93,9 @@ class CPUName:
             print("1. Set to 0x0601 for 1, 2, 4, or 6 Core")
             print("2. Set to 0x0F01 for 8+ Core")
             print("3. Reset to the default 0x00")
-            if self.detected != -1:
-                print("4. Use Local Machine's Value ({:,} Core{} = {})".format(self.detected, "" if self.detected==1 else "s", "0x0601" if self.detected < 8 else "0x0F01"))
             print("")
+            if self.detected != -1:
+                print("L. Use Local Machine's Value ({:,} Core{} = {})".format(self.detected, "" if self.detected==1 else "s", "0x0601" if self.detected < 8 else "0x0F01"))
             print("M. Return To Menu")
             print("Q. Quit")
             print("")
@@ -106,7 +106,7 @@ class CPUName:
             elif proc == "1": return 1537
             elif proc == "2": return 3841
             elif proc == "3": return 0
-            elif self.detected != -1 and proc == "4": return 1537 if self.detected < 8 else 3841
+            elif self.detected != -1 and proc.lower() == "l": return 1537 if self.detected < 8 else 3841
 
     def detect_cpu_model(self):
         try:

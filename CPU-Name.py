@@ -105,28 +105,26 @@ class CPUName:
         # Clear any prior values and ensure pathing
         plist_data = self.clear_values(plist_data)
         plist_data = self.ensure_path(plist_data,["NVRAM","Add","4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"],dict)
-        plist_data = self.ensure_path(plist_data,["NVRAM","Delete","4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"],list)
         plist_data = self.ensure_path(plist_data,["PlatformInfo","Generic","ProcessorType"],int)
         # Set our new values
         plist_data["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]["revcpu"] = revcpu
         plist_data["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]["revcpuname"] = cpuname
-        plist_data["NVRAM"]["Delete"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"].extend(["revcpu","revcpuname"])
         plist_data["PlatformInfo"]["Generic"]["ProcessorType"] = proctype
         return plist_data
 
     def clear_values(self, plist_data):
-        boot_args = plist_data.get("NVRAM",{}).get("Add",{}).get("7C436110-AB2A-4BBB-A880-FE41995C9F82",{}).get("boot-args","")
-        nv_a_val  = plist_data.get("NVRAM",{}).get("Add",{}).get("4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",{})
-        nv_d_val  = plist_data.get("NVRAM",{}).get("Delete",{}).get("4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",[])
+        # Ensure Delete values exist so we can prevent old values from sticking
+        plist_data = self.ensure_path(plist_data,["NVRAM","Delete","4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"],list)
+        plist_data = self.ensure_path(plist_data,["NVRAM","Delete","7C436110-AB2A-4BBB-A880-FE41995C9F82"],list)
+        # Gather our values
+        boot_args = plist_data["NVRAM"].get("Add",{}).get("7C436110-AB2A-4BBB-A880-FE41995C9F82",{}).get("boot-args","")
+        nv_a_val  = plist_data["NVRAM"].get("Add",{}).get("4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",{})
+        nv_d_val  = plist_data["NVRAM"]["Delete"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]
+        # Walk boot args to see if we use any revcpu* values and remove them
         if any(x in boot_args for x in ("revcpu=","revcpuname=")):
             boot_args = " ".join([x for x in boot_args.split() if not x.startswith(("revcpu=","revcpuname="))])
-            if boot_args:
-                plist_data["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = boot_args
-            elif self.clear_empty:
-                # Clean out boot-args and the UUID if they're both empty
-                plist_data["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].pop("boot-args",None)
-                if not plist_data["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]:
-                    plist_data["NVRAM"]["Add"].pop("7C436110-AB2A-4BBB-A880-FE41995C9F82",None)
+            plist_data["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = boot_args
+        # Remove them from the NVRAM -> Add section
         if any(x in nv_a_val for x in ("revcpu","revcpuname")):
             for x in ("revcpu","revcpuname"):
                 nv_a_val.pop(x,None)
@@ -135,13 +133,14 @@ class CPUName:
             elif self.clear_empty:
                 # Clean out the UUID if empty
                 plist_data["NVRAM"]["Add"].pop("4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",None)
-        if any(x in nv_d_val for x in ("revcpu","revcpuname")):
-            nv_d_val = [x for x in nv_d_val if not x in ("revcpu","revcpuname")]
-            if nv_d_val:
-                plist_data["NVRAM"]["Delete"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"] = nv_d_val
-            elif self.clear_empty:
-                # Clean out the UUID if empty
-                plist_data["NVRAM"]["Delete"].pop("4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",None)
+        # Ensure they remain in the NVRAM -> Delete section to prevent stuck values
+        for x in ("revcpu","revcpuname"):
+            if x in nv_d_val: continue
+            nv_d_val.append(x)
+        # Make sure we override boot-args to avoid any stickage too
+        if not "boot-args" in plist_data["NVRAM"]["Delete"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]:
+            plist_data["NVRAM"]["Delete"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].append("boot-args")
+        plist_data["NVRAM"]["Delete"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"] = nv_d_val
         if plist_data.get("PlatformInfo",{}).get("Generic",{}).get("ProcessorType",0) != 0:
             plist_data["PlatformInfo"]["Generic"]["ProcessorType"] = 0
         return plist_data

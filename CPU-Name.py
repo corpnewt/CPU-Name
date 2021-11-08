@@ -144,7 +144,6 @@ class CPUName:
                 plist_data["NVRAM"]["Delete"].pop("4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",None)
         if plist_data.get("PlatformInfo",{}).get("Generic",{}).get("ProcessorType",0) != 0:
             plist_data["PlatformInfo"]["Generic"]["ProcessorType"] = 0
-        self.u.grab("...")
         return plist_data
 
     def get_hex(self, value, pad_to=2):

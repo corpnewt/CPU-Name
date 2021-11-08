@@ -1,3 +1,5 @@
+import subprocess
+import platform
 from Scripts import plist, utils
 
 class CPUName:
@@ -6,6 +8,7 @@ class CPUName:
         self.plist_path = None
         self.plist_data = {}
         self.clear_empty = True
+        self.detected = self.detect_cores()
 
     def ensure_path(self, plist_data, path_list, final_type = list):
         if not path_list: return plist_data
@@ -89,6 +92,8 @@ class CPUName:
             print("1. Set to 0x0601 for 1, 2, 4, or 6 Core")
             print("2. Set to 0x0F01 for 8+ Core")
             print("3. Reset to the default 0x00")
+            if self.detected != -1:
+                print("4. Use Local Machine's Value ({} Cores = {})".format(self.detected, "0x0601" if self.detected < 8 else "0x0F01"))
             print("")
             print("M. Return To Menu")
             print("Q. Quit")
@@ -100,6 +105,33 @@ class CPUName:
             elif proc == "1": return 1537
             elif proc == "2": return 3841
             elif proc == "3": return 0
+            elif self.detected != -1 and proc == "4": return 1537 if self.detected < 8 else 3841
+
+    def detect_cores(self):
+        try:
+            _platform = platform.system().lower()
+
+            if _platform == "darwin":
+                data = subprocess.check_output(["sysctl", "-a", "machdep.cpu.core_count"]).decode().split(":")[1].strip()
+
+                return int(data)
+
+            elif _platform == "windows":
+                data = subprocess.check_output(["wmic", "cpu", "get", "NumberOfCores"]).decode().split("\n")[1].strip()
+
+                return int(data)
+
+            elif _platform == "linux":
+                data = subprocess.check_output(["cat", "/proc/cpuinfo"]).decode().split("\n")
+                value = ""
+
+                for line in data:
+                    if line.startswith("cpu cores"):
+                        value = line.split(":")[1].strip()
+
+                return int(value)
+        except Exception:
+            return -1
 
     def set_values(self, revcpu, cpuname, proctype, plist_data):
         # Clear any prior values and ensure pathing

@@ -1,5 +1,5 @@
 # CPU-Name
-Small py script to change the CPU name in About This Mac by leveraging functionality in Acidanthera's [RestricEvents](https://github.com/acidanthera/RestrictEvents).
+Small py script to change the CPU name in About This Mac by leveraging functionality in Acidanthera's [RestrictEvents](https://github.com/acidanthera/RestrictEvents).
 
 ***
 

@@ -2,6 +2,9 @@ import subprocess
 import platform
 from Scripts import plist, utils
 
+CPU_NAME_MAX = 48
+CPU_NAME_MAX_RECOMMENDED = 20
+
 class CPUName:
     def __init__(self, **kwargs):
         self.u = utils.Utils("CPU-Name")
@@ -231,6 +234,14 @@ class CPUName:
             print("")
             print("Selected Plist: {}".format(self.plist_path))
             print("Rev CPU Name:   {}".format("" if not self.plist_path else cpu_nam[0]+" (boot-arg)" if cpu_nam[0] else cpu_nam[1] if cpu_nam[1] else "Not Set"))
+            if len(cpu_nam[0] or cpu_nam[1]) > CPU_NAME_MAX:
+                print(" - Longer than the maximum allowed {:,} char{} - this value MAY NOT work!".format(
+                    CPU_NAME_MAX, "" if CPU_NAME_MAX==1 else "s"
+                ))
+            elif len(cpu_nam[0] or cpu_nam[1]) > CPU_NAME_MAX_RECOMMENDED:
+                print(" - Longer than the recommended {:,} char{}".format(
+                    CPU_NAME_MAX_RECOMMENDED, "" if CPU_NAME_MAX_RECOMMENDED==1 else "s"
+                ))
             print("Rev CPU:        {}".format("" if not self.plist_path else cpu_rev[0]+" (boot-arg)" if cpu_rev[0] else cpu_rev[1] if cpu_rev[1] else "Not Set"))
             print("Processor Type: {}{}".format("" if not self.plist_path else self.get_hex(p_type),"" if not self.plist_path else p_label))
             print("RestrictEvents: {}".format("" if not self.plist_path else k_label))
@@ -258,6 +269,23 @@ class CPUName:
                     if new_type is None: continue
                     p_type = new_type
                 new_name = self.get_new_cpu_name(self.plist_data)
+                # Check if we're beyond our max or recommended and prompt
+                if new_name and (len(new_name) > CPU_NAME_MAX_RECOMMENDED or len(new_name) > CPU_NAME_MAX):
+                    t,v,d = ("allowed",CPU_NAME_MAX,"work at all") if len(new_name) > CPU_NAME_MAX else ("recommended",CPU_NAME_MAX_RECOMMENDED,"display correctly")
+                    while True:
+                        self.u.head()
+                        print("")
+                        print("The selected CPU name is beyond the {} max of {:,} char{} and may not\n{}:\n".format(
+                            t,v,"" if v==1 else "s",d
+                        ))
+                        print(new_name)
+                        print("")
+                        use = self.u.grab("Are you sure you want to continue? (y/n):  ")
+                        if use.lower() == "y":
+                            break
+                        elif use.lower() == "n":
+                            new_name = None
+                            break
                 if new_name is None: continue
                 self.plist_data = self.set_values(1,new_name,p_type,self.plist_data)
                 self.save_plist()

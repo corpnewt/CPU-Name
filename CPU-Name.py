@@ -74,6 +74,14 @@ class CPUName:
     def get_proc_type(self, plist_data):
         return plist_data.get("PlatformInfo",{}).get("Generic",{}).get("ProcessorType",0)
 
+    def get_revpatch(self, plist_data):
+        b,n = self.get_value(plist_data,"revpatch")
+        if b: # Using a boot-arg
+            on = "auto" in b or "cpuname" in b
+        else: # Using the NVRAM var
+            on = "auto" in n or "cpuname" in n
+        return (b,n,on)
+
     def get_kext(self, plist_data):
         kext_list = plist_data.get("Kernel",{}).get("Add",[])
         found = enabled = False
@@ -143,14 +151,44 @@ class CPUName:
             pass
         return -1
 
+    def convert_revpatch(self, revpatch, adding=True):
+        # Walk the revpatch value and ensure that we only touch the cpuname property
+        if not revpatch:
+            return None # Nothing currently set - auto is fine
+        revparts = [x.lower() for x in revpatch.split(",")] # get the parts
+        if adding:
+            # Make sure we have auto or cpuname
+            if not "auto" in revparts or not "cpuname" in revparts:
+                revparts.append("cpuname")
+        else:
+            # convert "auto" to "memtab" and "pci"
+            if "auto" in revparts:
+                revparts = [x for x in revparts if not x == "auto"]+["memtab","pci"]
+            if "cpuname" in revparts:
+                revparts = [x for x in revparts if not x == "cpuname"]
+        if not revparts:
+            return None # Value is cleared
+        # Strip duplicates and consolidate args as needed
+        revparts = list(set(revparts))
+        if len(revparts)==3 and all((x in revparts for x in ("cpuname","memtab","pci"))):
+            revparts = ["auto"] # Just using the auto mode at this point
+        return ",".join(revparts)
+
     def set_values(self, revcpu, cpuname, proctype, plist_data):
         # Clear any prior values and ensure pathing
         plist_data = self.clear_values(plist_data)
         plist_data = self.ensure_path(plist_data,["NVRAM","Add","4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"],dict)
         plist_data = self.ensure_path(plist_data,["PlatformInfo","Generic","ProcessorType"],int)
+        # Special revpatch considerations
+        rev_test  = self.get_revpatch(plist_data)
+        revpatch  = rev_test[0] or rev_test[1] or None
+        if revpatch: # Adjust as needed
+            revpatch = self.convert_revpatch(revpatch,adding=True)
         # Set our new values
         plist_data["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]["revcpu"] = revcpu
         plist_data["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]["revcpuname"] = cpuname
+        if revpatch:
+            plist_data["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]["revpatch"] = revpatch
         plist_data["PlatformInfo"]["Generic"]["ProcessorType"] = proctype
         return plist_data
 
@@ -162,13 +200,18 @@ class CPUName:
         boot_args = plist_data["NVRAM"].get("Add",{}).get("7C436110-AB2A-4BBB-A880-FE41995C9F82",{}).get("boot-args","")
         nv_a_val  = plist_data["NVRAM"].get("Add",{}).get("4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",{})
         nv_d_val  = plist_data["NVRAM"]["Delete"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]
+        # Special revpatch considerations
+        rev_test  = self.get_revpatch(plist_data)
+        revpatch  = rev_test[0] or rev_test[1] or None
+        if revpatch: # Adjust as needed
+            revpatch = self.convert_revpatch(revpatch,adding=False)
         # Walk boot args to see if we use any revcpu* values and remove them
-        if any(x in boot_args for x in ("revcpu=","revcpuname=")):
-            boot_args = " ".join([x for x in boot_args.split() if not x.startswith(("revcpu=","revcpuname="))])
+        if any(x in boot_args for x in ("revcpu=","revcpuname=","revpatch=")):
+            boot_args = " ".join([x for x in boot_args.split() if not x.startswith(("revcpu=","revcpuname=","revpatch="))])
             plist_data["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = boot_args
         # Remove them from the NVRAM -> Add section
-        if any(x in nv_a_val for x in ("revcpu","revcpuname")):
-            for x in ("revcpu","revcpuname"):
+        if any(x in nv_a_val for x in ("revcpu","revcpuname","revpatch")):
+            for x in ("revcpu","revcpuname","revpatch"):
                 nv_a_val.pop(x,None)
             if nv_a_val:
                 plist_data["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"] = nv_a_val
@@ -176,7 +219,7 @@ class CPUName:
                 # Clean out the UUID if empty
                 plist_data["NVRAM"]["Add"].pop("4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102",None)
         # Ensure they remain in the NVRAM -> Delete section to prevent stuck values
-        for x in ("revcpu","revcpuname"):
+        for x in ("revcpu","revcpuname","revpatch"):
             if x in nv_d_val: continue
             nv_d_val.append(x)
         # Make sure we override boot-args to avoid any stickage too
@@ -185,6 +228,9 @@ class CPUName:
         plist_data["NVRAM"]["Delete"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"] = nv_d_val
         if plist_data.get("PlatformInfo",{}).get("Generic",{}).get("ProcessorType",0) != 0:
             plist_data["PlatformInfo"]["Generic"]["ProcessorType"] = 0
+        # Finally - check if we need to write in a revpatch NVRAM var
+        if revpatch:
+            plist_data["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]["revpatch"] = revpatch
         return plist_data
 
     def get_hex(self, value, pad_to=2):
@@ -224,12 +270,13 @@ class CPUName:
     
     def main(self):
         while True:
-            cpu_rev = self.get_rev_cpu(self.plist_data)
-            cpu_nam = self.get_cpu_name(self.plist_data)
-            p_type  = self.get_proc_type(self.plist_data)
-            p_label = " (8+ Core)" if p_type == 3841 else " (1, 2, 4, or 6 Core)" if p_type == 1537 else " (Must be 0x0601 or 0x0F01 to work!)"
-            f,e     = self.get_kext(self.plist_data)
-            k_label = "Not Found (Must be present and Enabled to work!)" if not f else "Disabled (Must be Enabled to work!)" if not e else "Found and Enabled"
+            cpu_nam  = self.get_cpu_name(self.plist_data)
+            cpu_rev  = self.get_rev_cpu(self.plist_data)
+            p_type   = self.get_proc_type(self.plist_data)
+            revpatch = self.get_revpatch(self.plist_data)
+            p_label  = " (8+ Core)" if p_type == 3841 else " (1, 2, 4, or 6 Core)" if p_type == 1537 else " (Must be 0x0601 or 0x0F01 to work!)"
+            f,e      = self.get_kext(self.plist_data)
+            k_label  = "Not Found (Must be present and Enabled to work!)" if not f else "Disabled (Must be Enabled to work!)" if not e else "Found and Enabled"
             self.u.head()
             print("")
             print("Selected Plist: {}".format(self.plist_path))
@@ -244,6 +291,10 @@ class CPUName:
                 ))
             print("Rev CPU:        {}".format("" if not self.plist_path else cpu_rev[0]+" (boot-arg)" if cpu_rev[0] else cpu_rev[1] if cpu_rev[1] else "Not Set"))
             print("Processor Type: {}{}".format("" if not self.plist_path else self.get_hex(p_type),"" if not self.plist_path else p_label))
+            print("Rev Patch:      {}{}".format(
+                "" if not self.plist_path else revpatch[0]+" (boot-arg)" if revpatch[0] else revpatch[1] if revpatch[1] else "Not Set (Defaults to auto)",
+                " (NOT changing CPU name!)" if (revpatch[0] or revpatch[1]) and not revpatch[-1] else ""
+            ))
             print("RestrictEvents: {}".format("" if not self.plist_path else k_label))
             print("")
             print("Note:  Changes are saved to the target plist immediately.")
@@ -251,7 +302,7 @@ class CPUName:
             print("")
             print("1. Change CPU Name")
             print("2. Change Processor Type")
-            print("3. Clear CPU Name, Rev CPU, and Processor Type")
+            print("3. Clear CPU Name, Rev CPU, Processor Type, and remove cpuname from Rev Patch")
             print("4. Select Plist")
             print("")
             print("Q. Quit")
@@ -301,5 +352,6 @@ class CPUName:
             elif menu == "4":
                 self.select_plist()
 
-c = CPUName()
-c.main()
+if __name__ == "__main__":
+    c = CPUName()
+    c.main()

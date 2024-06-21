@@ -141,7 +141,11 @@ class CPUName:
             if _platform == "darwin":
                 return int(subprocess.check_output(["sysctl", "-a", "machdep.cpu.core_count"]).decode().split(":")[1].strip())
             elif _platform == "windows":
-                return int(subprocess.check_output(["wmic", "cpu", "get", "NumberOfCores"]).decode().split("\n")[1].strip())
+                try:
+                    return int(subprocess.check_output(["wmic", "cpu", "get", "NumberOfCores"]).decode().split("\n")[1].strip())
+                except:
+                    data = subprocess.check_output(["powershell","-c","$p=Get-ComputerInfo -Property CsProcessors;$p.CsProcessors"]).decode().split("\n")
+                    return next((int(x.split(":")[-1].strip()) for x in data if x.startswith("NumberOfCores")),-1)
             elif _platform == "linux":
                 data = subprocess.check_output(["cat", "/proc/cpuinfo"]).decode().split("\n")
                 for line in data:

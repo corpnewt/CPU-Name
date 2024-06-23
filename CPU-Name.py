@@ -1,5 +1,5 @@
 import subprocess
-import platform
+import platform, os
 from Scripts import plist, utils
 
 CPU_NAME_MAX = 48
@@ -11,6 +11,17 @@ class CPUName:
         self.plist_path = None
         self.plist_data = {}
         self.clear_empty = True
+        self.win_cpu_info = []
+        if os.name == "nt":
+            # Check if we have wmic - if not, gather our CPU info once
+            # and store it as a var
+            try:
+                subprocess.check_output(["where","wmic"],stderr=subprocess.PIPE)
+            except:
+                # Fall back on the much slower powershell functions
+                self.win_cpu_info = subprocess.check_output(
+                    ["powershell","-c","$p=Get-ComputerInfo -Property CsProcessors;$p.CsProcessors"]
+                ).decode().split("\n")
         self.detected = self.detect_cores()
         self.cpu_model = self.detect_cpu_model()
 
@@ -125,7 +136,10 @@ class CPUName:
             if _platform == "darwin":
                 return subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"]).decode().strip()
             elif _platform == "windows":
-                return subprocess.check_output(["wmic", "cpu", "get", "Name"]).decode().split("\n")[1].strip()
+                if self.win_cpu_info:
+                    return next((":".join(x.split(":")[1:]).strip() for x in self.win_cpu_info if x.startswith("Name")),"")
+                else:
+                    return subprocess.check_output(["wmic", "cpu", "get", "Name"]).decode().split("\n")[1].strip()
             elif _platform == "linux":
                 data = subprocess.check_output(["cat", "/proc/cpuinfo"]).decode().split("\n")
                 for line in data:
@@ -141,11 +155,10 @@ class CPUName:
             if _platform == "darwin":
                 return int(subprocess.check_output(["sysctl", "-a", "machdep.cpu.core_count"]).decode().split(":")[1].strip())
             elif _platform == "windows":
-                try:
+                if self.win_cpu_info:
+                    return next((int(x.split(":")[-1].strip()) for x in self.win_cpu_info if x.startswith("NumberOfCores")),-1)
+                else:
                     return int(subprocess.check_output(["wmic", "cpu", "get", "NumberOfCores"]).decode().split("\n")[1].strip())
-                except:
-                    data = subprocess.check_output(["powershell","-c","$p=Get-ComputerInfo -Property CsProcessors;$p.CsProcessors"]).decode().split("\n")
-                    return next((int(x.split(":")[-1].strip()) for x in data if x.startswith("NumberOfCores")),-1)
             elif _platform == "linux":
                 data = subprocess.check_output(["cat", "/proc/cpuinfo"]).decode().split("\n")
                 for line in data:

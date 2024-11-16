@@ -247,6 +247,9 @@ class CPUName:
             plist_data["PlatformInfo"]["Generic"]["ProcessorType"] = 0
         # Finally - check if we need to write in a revpatch NVRAM var
         if revpatch:
+            if not "4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102" in plist_data["NVRAM"]["Add"]:
+                # May have been removed before by clear_empty - initialize it
+                plist_data["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"] = {}
             plist_data["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]["revpatch"] = revpatch
         return plist_data
 
